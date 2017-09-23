@@ -1,5 +1,5 @@
 """
-This bot vote-follows accounts and tracks the votes of Curie's "Vote Followers", and logs them after payout with the Curation rewards.
+This bot tracks the votes of Curie's "Vote Followers", and logs them after payout with the Curation rewards.
 
 Written by @Locikll
 
@@ -38,13 +38,13 @@ from random import randint
 #EDITABLE VARIABLES {{
 
 #Steemit Node & Account stuff
-Node = ""
+Node = "wss://this.piston.rocks"
 
 steemPostingKey = ''  #Private posting key
 steemAccountName = 'curie' 
 
 #List of Followed Curators
-followedcurators = ['locikll','liberosist','geekgirl','alcibiades','skadi']
+followedcurators = ['frontpage','blitz','eureka','homesteadbuilder','poeticammo','dna-replication','archdruid','skadi','zeks','camelot','thunderbird','teacherspet']
 
 
 #Recent Activity limit (Increase this if users have large number of activities / second), 5 should be a large enough size
@@ -129,6 +129,8 @@ def votefeed(usrn):
          
         if Isvote=='vote':
             
+            votername = Curatorvotes[checkpost][1]['op'][1]['voter']
+            
             userweight = Curatorvotes[checkpost][1]['op'][1]['weight'] / 100
             
             permlink = Curatorvotes[checkpost][1]['op'][1]['permlink']
@@ -148,18 +150,15 @@ def votefeed(usrn):
                 
                 IDIN.append( any(e[0] == identifier for e in curatordict[followedcurators[chkID]]) )
                 
-            
-            if True not in IDIN:
+            #Make sure the votername is the same as the curator
+            if True not in IDIN and votername == curatoraccs:
 
-                #try:
                 votetime = (list(filter(lambda voter: voter['voter']==curatoraccs,steem.get_post(identifier).active_votes))[0]['time']).replace('T',' ')
             
                 curatordict[curatoraccs].append([identifier,votetime])
 
                 print('Post has been voted on: '+str(identifier))
-                
-                #except:
-                 #   print("Error recording vote, the vote might have changed")
+
                               
         else:
             continue
