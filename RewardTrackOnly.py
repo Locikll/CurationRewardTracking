@@ -41,15 +41,13 @@ from random import randint
 Node = "wss://this.piston.rocks"
 
 steemPostingKey = ''  #Private posting key
-steemAccountName = 'curie' 
+steemAccountName = 'locikll' 
 
 #List of Followed Curators
 followedcurators = ['frontpage','blitz','eureka','homesteadbuilder','poeticammo','dna-replication','archdruid','skadi','zeks','camelot','thunderbird','teacherspet']
 
-
 #Recent Activity limit (Increase this if users have large number of activities / second), 5 should be a large enough size
 ACTLIMIT = 5
-
 
 # Number of Seconds of following votes between checking the votes to see if any correspond to a curation reward (ie 1800 means 30 minutes of following votes and 1 iteration of checking the votes)
 seccheck = 1800
@@ -59,21 +57,36 @@ REWHLIM = 1500
 #VOTER = 'locikll'
 RewHistACC = 'curie'
 
-#Number of processing threads to allocate for multithreading purposes
-PROCESSINGTHREADS = 4
+#Number of processing threads to allocate for multithreading purposes, -->this multithreading only works on Windows currently, for Unix, set PROCESSINGTHREADS = 1
+PROCESSINGTHREADS = 1
 
 
 #EDITABLE VARIABLES STOP/END  }}
-
 
 steem = Steem(wif=steemPostingKey,node=Node)
 
 if Path('curatordict.pickle').is_file():
     curatordict = pickle.load(open('curatordict.pickle','rb'))
+    savednumcur = len(curatordict.keys())
+    
+    # Allow for Appending or removing curators
+    if list(curatordict.keys()) != followedcurators:
+        #Differences in Curators
+        diff = list( set(curatordict).symmetric_difference(set(followedcurators)) )
+              
+        
+        for differ in range(0,len(diff)):
+            
+            if diff[differ] in list(curatordict.keys() ) and diff[differ] not in followedcurators:
+                curatordict.pop(diff[differ])
+                
+            elif diff[differ] not in list(curatordict.keys() ) and diff[differ] in followedcurators:
+                curatordict[diff[differ]] = []
+        
+        print(curatordict)
+            
 else:
     curatordict = OrderedDict((el,[]) for el in followedcurators)
-
-#print(curatordict)
 
 #Initial File Manipulation and storage
 wb = Workbook()
@@ -85,9 +98,9 @@ def setupfiledir():
     if not os.path.exists(filepath):
         os.makedirs(filepath)
     
-    for Files in range(0,len(followedcurators)):
+    for Files in range(0,len(curatordict.keys())):
         
-        filenamepath = filepath+'/'+followedcurators[Files]+'.xlsx'
+        filenamepath = filepath+'/'+list(curatordict.keys())[Files]+'.xlsx'
         curfiles = Path(filenamepath)
         
         if not curfiles.is_file():
@@ -117,8 +130,7 @@ def votefeed(usrn):
     
     #print(Curatorvotes)
     for checkpost in range(0,len(Curatorvotes)):
-        
-        
+              
         try:
             Isvote = Curatorvotes[checkpost][1]['op'][0]
         except Exception:
@@ -146,9 +158,9 @@ def votefeed(usrn):
             
             IDIN = []
             
-            for chkID in range(0,len(followedcurators)):    
+            for chkID in range(0,len(curatordict.keys())):    
                 
-                IDIN.append( any(e[0] == identifier for e in curatordict[followedcurators[chkID]]) )
+                IDIN.append( any(e[0] == identifier for e in curatordict[list(curatordict.keys())[chkID]]) )
                 
             #Make sure the votername is the same as the curator
             if True not in IDIN and votername == curatoraccs:
@@ -158,8 +170,7 @@ def votefeed(usrn):
                 curatordict[curatoraccs].append([identifier,votetime])
 
                 print('Post has been voted on: '+str(identifier))
-
-                              
+                          
         else:
             continue
          
@@ -173,11 +184,15 @@ def votefeed(usrn):
 #Check the post rewards to see whether the votes are within the past 2-3 days of voting rewards.    
 def checkrewards(curname):
     
-    if len(curatordict[followedcurators[curname]]) > 0:
+    curatornames = list(curatordict.keys())
+    
+    print("Curation Reward History for "+str(curatornames[curname])+":")
+    
+    if len(curatordict[curatornames[curname]]) > 0:
         
         Rewardhistory = list(pysteem.account.Account(RewHistACC).get_account_history(filter_by='curation_reward',limit=REWHLIM,index=-1,order=1))
     
-        Curatorsvotedposts = curatordict[followedcurators[curname]]
+        Curatorsvotedposts = curatordict[curatornames[curname]]
         
         indel = []
         
@@ -185,7 +200,6 @@ def checkrewards(curname):
             
             POSTID = Curatorsvotedposts[Post][0]
             VOTETIME = Curatorsvotedposts[Post][1]
-            
             
             votetimedatetime = datetime.strptime(VOTETIME,'%Y-%m-%d %H:%M:%S')
             dayssincevote = (datetime.utcnow() - votetimedatetime).seconds / (3600*24)
@@ -205,19 +219,19 @@ def checkrewards(curname):
                     
                     steemreward = rewardMvest * steemperMvest
                     
-                    curatordict[followedcurators[curname]][Post].append(steemreward)
+                    curatordict[curatornames[curname]][Post].append(steemreward)
                     
-                    wb = load_workbook(filepath+'/'+followedcurators[curname]+'.xlsx')
+                    wb = load_workbook(filepath+'/'+curatornames[curname]+'.xlsx')
                     ws = wb.active
 
-                    ws.append(curatordict[followedcurators[curname]][Post])
+                    ws.append(curatordict[curatornames[curname]][Post])
                     
                     lastrow = ws.max_row
                     
                     ws[("D"+str(lastrow))] = "=SUM(C1:"+"C"+str(lastrow)+")"           
                     ws["E2"] = "=SUM(C:C)"
                     
-                    wb.save(filepath+'/'+followedcurators[curname]+'.xlsx')
+                    wb.save(filepath+'/'+curatornames[curname]+'.xlsx')
 
                     print(POSTID)
                     
@@ -228,7 +242,7 @@ def checkrewards(curname):
         for dkey in range(0,len(indel)):
             # -dkey so that when an item is removed, it keeps the index in range
             IDXDELETE = indel[dkey] - dkey
-            del(curatordict[followedcurators[curname]][IDXDELETE])
+            del(curatordict[curatornames[curname]][IDXDELETE])
     
             #print(dayssincevote)
 
@@ -257,7 +271,7 @@ if __name__ == "__main__":
     while True:
         try:            
             p=mp.Pool(PROCESSINGTHREADS)
-            p.map(votefeed,range(0,len(followedcurators)))
+            p.map(votefeed,range(0,len(curatordict.keys())))
             p.close()
             p.join()
             clk = time.clock() 
@@ -265,7 +279,7 @@ if __name__ == "__main__":
             if (clk-n*seccheck)>seccheck:
                 print(clk-n*seccheck)
                 q=mp.Pool(PROCESSINGTHREADS)
-                q.map(checkrewards,range(0,len(followedcurators)))    
+                q.map(checkrewards,range(0,len(curatordict.keys())))    
                 q.close()
                 q.join()
                 n=n+1
